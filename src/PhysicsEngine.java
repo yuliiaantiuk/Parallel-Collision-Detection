@@ -3,12 +3,14 @@ import java.util.List;
 
 public class PhysicsEngine {
     private List<PolygonBody> bodies;
+    private UniformGrid grid;
     private double width, height;
 
     public PhysicsEngine(double width, double height) {
         this.width = width;
         this.height = height;
         this.bodies = new ArrayList<>();
+        this.grid = new UniformGrid(width, height, 100.0); // розмір клітинки потім
     }
 
     public List<PolygonBody> getBodies() {
@@ -20,9 +22,43 @@ public class PhysicsEngine {
             b.update(dt, width, height);
         }
 
-        for (int i = 0; i < bodies.size(); i++) {
-            for (int j = i + 1; j < bodies.size(); j++) {
-                checkAndResolve(bodies.get(i), bodies.get(j));
+        grid.clear();
+        for (PolygonBody b : bodies) {
+            grid.insert(b);
+        }
+
+        for (int x = 0; x < grid.getCols(); x++) {
+            for (int y = 0; y < grid.getRows(); y++) {
+                checkCollisionsInCell(x, y);
+            }
+        }
+    }
+
+    private void checkCollisionsInCell(int x, int y) {
+        List<PolygonBody> currentCell = grid.getCells()[x][y];
+        if (currentCell.isEmpty()) return;
+        // в межах цієї клітинки
+        for (int i = 0; i < currentCell.size(); i++) {
+            for (int j = i + 1; j < currentCell.size(); j++) {
+                checkAndResolve(currentCell.get(i), currentCell.get(j));
+            }
+        }
+
+        // сусідні клітинки
+        // ліво, низ, ліва нижня діагональ
+        int[][] offsets = {{1, 0}, {1, 1}, {0, 1}, {-1, 1}};
+
+        for (int[] offset : offsets) {
+            int nx = x + offset[0];
+            int ny = y + offset[1];
+
+            if (nx >= 0 && nx < grid.getCols() && ny >= 0 && ny < grid.getRows()) {
+                List<PolygonBody> nextCell = grid.getCells()[nx][ny];
+                for (PolygonBody a : currentCell) {
+                    for (PolygonBody b : nextCell) {
+                        checkAndResolve(a, b);
+                    }
+                }
             }
         }
     }

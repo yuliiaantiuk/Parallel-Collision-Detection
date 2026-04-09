@@ -121,7 +121,9 @@ public class PhysicsVisualizer extends JPanel {
 
         double dt = 0.016;
         long totalTime = 0;
-        int runs = 20;
+        int runs = 5;
+
+        engine.update(dt);
 
         for (int i = 0; i < runs; i++) {
             long start = System.nanoTime();
