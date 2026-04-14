@@ -2,6 +2,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PolygonBody {
+    private static int nextId = 0;
+    public final int id;
     public Vector2D position;
     public Vector2D velocity;
     public List<Vector2D> vertices;
@@ -9,11 +11,21 @@ public class PolygonBody {
     public double mass;
 
     public PolygonBody(Vector2D pos, double radius) {
+        this.id = nextId++;
         this.position = pos;
         this.velocity = new Vector2D(Math.random() * 300 - 100, Math.random() * 300 - 100);
         this.radius = radius;
         this.vertices = generateRandomPolygon(radius);
         this.mass = radius * radius;
+    }
+
+    public PolygonBody(PolygonBody other) {
+        this.id = other.id; // Копіюємо ID!
+        this.position = new Vector2D(other.position.x, other.position.y);
+        this.velocity = new Vector2D(other.velocity.x, other.velocity.y);
+        this.radius = other.radius;
+        this.vertices = new ArrayList<>(other.vertices);
+        this.mass = other.mass;
     }
 
     private List<Vector2D> generateRandomPolygon(double radius) {
@@ -28,6 +40,8 @@ public class PolygonBody {
         }
         return v;
     }
+
+    public static void resetIdCounter() { nextId = 0; }
 
     public void update(double dt, double width, double height) {
         position.x += velocity.x * dt;

@@ -5,13 +5,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PhysicsVisualizer extends JPanel {
-    private final PhysicsEngine engine;
+    private final PhysicsEngine sequentialEngine;
+    ParallelPhysicsEngine parallelEngine;
     private final int width = 800;
     private final int height = 600;
 
-    public PhysicsVisualizer() {
-        engine = new PhysicsEngine(width, height);
-        generateInitialBodies(50);
+    public PhysicsVisualizer(int num_threads) {
+        sequentialEngine = new PhysicsEngine(width, height);
+        parallelEngine = new ParallelPhysicsEngine(width, height, num_threads);
+        generateInitialBodies(30);
 
         this.setPreferredSize(new Dimension(width, height));
         this.setBackground(Color.WHITE);
@@ -26,7 +28,8 @@ public class PhysicsVisualizer extends JPanel {
             );
 
             PolygonBody body = new PolygonBody(pos, radius);
-            engine.getBodies().add(body);
+            // sequentialEngine.getBodies().add(body);
+            parallelEngine.getBodies().add(body);
         }
     }
 
@@ -40,12 +43,13 @@ public class PhysicsVisualizer extends JPanel {
             if (deltaTime > 0.05) deltaTime = 0.05;
 
             long startCalc = System.nanoTime();
-            engine.update(deltaTime);
+            // sequentialEngine.update(deltaTime);
+            parallelEngine.update(deltaTime);
             long endCalc = System.nanoTime();
 
             if (System.currentTimeMillis() % 1000 < 15) {
                 double ms = (endCalc - startCalc) / 1_000_000.0;
-                System.out.printf("Objects: %d | Calc Time: %.3f ms\n", engine.getBodies().size(), ms);
+                System.out.printf("Objects: %d | Calc Time: %.3f ms\n", sequentialEngine.getBodies().size(), ms);
             }
 
             repaint();
@@ -67,7 +71,10 @@ public class PhysicsVisualizer extends JPanel {
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(2f));
 
-        for (PolygonBody body : engine.getBodies()) {
+//        for (PolygonBody body : sequentialEngine.getBodies()) {
+//            drawPolygon(g2, body);
+//        }
+        for (PolygonBody body : parallelEngine.getBodies()) {
             drawPolygon(g2, body);
         }
     }
@@ -105,29 +112,42 @@ public class PhysicsVisualizer extends JPanel {
 //        frame.setVisible(true);
 //        new Thread(visualizer::startSimulation).start();
 
+//        JFrame frame = new JFrame("Collision Detection Parallel 1");
+//        PhysicsVisualizer visualizer = new PhysicsVisualizer(4);
+//
+//        frame.add(visualizer);
+//        frame.pack();
+//        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//        frame.setLocationRelativeTo(null);
+//        frame.setVisible(true);
+//        new Thread(visualizer::startSimulation).start();
 
-        PhysicsVisualizer visualizer = new PhysicsVisualizer();
 
+        int[] threads = {2, 4, 6, 8, 10, 12};
         int[] sizes = {100, 500, 1000, 1500, 2500, 5000, 10000, 20000, 50000, 100000};
+
         for (int size : sizes) {
-            visualizer.runBenchmark(size);
+            for (int thread : threads) {
+                PhysicsVisualizer visualizer = new PhysicsVisualizer(thread);
+                visualizer.runBenchmark(size);
+            }
         }
 
     }
 
     public void runBenchmark(int objectCount) {
-        engine.getBodies().clear();
+        sequentialEngine.getBodies().clear();
         generateInitialBodies(objectCount);
 
         double dt = 0.016;
         long totalTime = 0;
         int runs = 5;
 
-        engine.update(dt);
+        parallelEngine.update(dt);
 
         for (int i = 0; i < runs; i++) {
             long start = System.nanoTime();
-            engine.update(dt);
+            parallelEngine.update(dt);
             long end = System.nanoTime();
 
             totalTime += (end - start);
