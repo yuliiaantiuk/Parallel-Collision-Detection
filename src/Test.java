@@ -8,7 +8,8 @@ public class Test {
         int iterations = 100;
 
         PhysicsEngine sequentialEngine = new PhysicsEngine(800, 600);
-        ParallelPhysicsEngine parallelEngine = new ParallelPhysicsEngine(800, 600, 1);
+        ParallelPhysicsEngine poolEngine = new ParallelPhysicsEngine(800, 600, 1);
+        ParallelPhysicsEngine fjEngine = new ParallelPhysicsEngine(800, 600, 1);
 
         List<PolygonBody> prototypes = new ArrayList<>();
         PolygonBody.resetIdCounter();
@@ -21,34 +22,50 @@ public class Test {
 
         for (PolygonBody proto : prototypes) {
             sequentialEngine.getBodies().add(new PolygonBody(proto));
-            parallelEngine.getBodies().add(new PolygonBody(proto));
+            poolEngine.getBodies().add(new PolygonBody(proto));
+            fjEngine.getBodies().add(new PolygonBody(proto));
         }
-
         System.out.println("Starting verification for " + iterations + " steps");
 
         for (int i = 0; i < iterations; i++) {
             sequentialEngine.update(dt);
-            parallelEngine.update(dt);
+            poolEngine.update(dt);
+            fjEngine.updateForkJoin(dt);
         }
 
-        double maxDiff = 0;
+        double maxDiffPool = 0;
+        double maxDiffFJ = 0;
+
         for (int i = 0; i < testSize; i++) {
-            PolygonBody b1 = sequentialEngine.getBodies().get(i);
-            PolygonBody b2 = parallelEngine.getBodies().get(i);
+            PolygonBody bSeq = sequentialEngine.getBodies().get(i);
+            PolygonBody bPool = poolEngine.getBodies().get(i);
+            PolygonBody bFJ = fjEngine.getBodies().get(i);
 
-            double diffX = Math.abs(b1.position.x - b2.position.x);
-            double diffY = Math.abs(b1.position.y - b2.position.y);
-            maxDiff = Math.max(maxDiff, Math.max(diffX, diffY));
+            // Порівняння Sequential vs Fixed Pool
+            double dPoolX = Math.abs(bSeq.position.x - bPool.position.x);
+            double dPoolY = Math.abs(bSeq.position.y - bPool.position.y);
+            maxDiffPool = Math.max(maxDiffPool, Math.max(dPoolX, dPoolY));
+
+            // Порівняння Sequential vs ForkJoin
+            double dFJX = Math.abs(bSeq.position.x - bFJ.position.x);
+            double dFJY = Math.abs(bSeq.position.y - bFJ.position.y);
+            maxDiffFJ = Math.max(maxDiffFJ, Math.max(dFJX, dFJY));
         }
 
-        System.out.println("Maximum coordinate difference: " + maxDiff);
+        System.out.println("Max diff (Sequential vs Fixed Pool): " + maxDiffPool);
+        System.out.println("Max diff (Sequential vs ForkJoin):   " + maxDiffFJ);
 
-        if (maxDiff < 1e-9) {
-            System.out.println("SUCCESS: Parallel and Sequential algorithms are identical.");
+        boolean poolOk = maxDiffPool < 1e-9;
+        boolean fjOk = maxDiffFJ < 1e-9;
+
+        if (poolOk && fjOk) {
+            System.out.println("SUCCESS!");
         } else {
-            System.out.println("FAILURE!");
+            if (!poolOk) System.out.println("FAILURE: Fixed Pool!");
+            if (!fjOk) System.out.println("FAILURE: ForkJoin!");
         }
 
-        parallelEngine.shutdown();
+        poolEngine.shutdown();
+        fjEngine.shutdown();
     }
 }

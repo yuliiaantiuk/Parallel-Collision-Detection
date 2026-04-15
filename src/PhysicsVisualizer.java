@@ -112,26 +112,26 @@ public class PhysicsVisualizer extends JPanel {
 //        frame.setVisible(true);
 //        new Thread(visualizer::startSimulation).start();
 
-//        JFrame frame = new JFrame("Collision Detection Parallel 1");
-//        PhysicsVisualizer visualizer = new PhysicsVisualizer(4);
+        JFrame frame = new JFrame("Collision Detection Parallel 1");
+        PhysicsVisualizer visualizer = new PhysicsVisualizer(4);
+
+        frame.add(visualizer);
+        frame.pack();
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+        new Thread(visualizer::startSimulation).start();
+
+
+//        int[] threads = {2, 4, 6, 8, 10, 12};
+//        int[] sizes = {100, 500, 1000, 1500, 2500, 5000, 10000, 20000, 50000, 100000};
 //
-//        frame.add(visualizer);
-//        frame.pack();
-//        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-//        frame.setLocationRelativeTo(null);
-//        frame.setVisible(true);
-//        new Thread(visualizer::startSimulation).start();
-
-
-        int[] threads = {2, 4, 6, 8, 10, 12};
-        int[] sizes = {100, 500, 1000, 1500, 2500, 5000, 10000, 20000, 50000, 100000};
-
-        for (int size : sizes) {
-            for (int thread : threads) {
-                PhysicsVisualizer visualizer = new PhysicsVisualizer(thread);
-                visualizer.runBenchmark(size);
-            }
-        }
+//        for (int size : sizes) {
+//            for (int thread : threads) {
+//                PhysicsVisualizer visualizer = new PhysicsVisualizer(thread);
+//                visualizer.runBenchmark(size);
+//            }
+//        }
 
     }
 
