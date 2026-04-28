@@ -6,7 +6,7 @@ public class CollisionDetector {
         CollisionInfo info = new CollisionInfo();
         List<Vector2D> axes = getAxes(a, b);
 
-        double minOverlap = Double.MAX_VALUE;
+        double minOverlap = Double.MAX_VALUE; // нескінченність на початку
         Vector2D smallestAxis = null;
 
         for (Vector2D axis : axes) {
@@ -62,11 +62,12 @@ public class CollisionDetector {
         double max = -Double.MAX_VALUE;
 
         for (Vector2D vertex : body.vertices) {
+            // координати відносно простору, а не центру об'єкта
             double worldVertexX = body.position.x + vertex.x;
             double worldVertexY = body.position.y + vertex.y;
 
             double dot = worldVertexX * axis.x + worldVertexY * axis.y;
-
+            // найлівіша і найправіша точка
             if (dot < min) min = dot;
             if (dot > max) max = dot;
         }

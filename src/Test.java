@@ -25,6 +25,11 @@ public class Test {
             poolEngine.getBodies().add(new PolygonBody(proto));
             fjEngine.getBodies().add(new PolygonBody(proto));
         }
+
+        sequentialEngine.initializeGrid(3.0);
+        poolEngine.initializeGrid(3.0);
+        fjEngine.initializeGrid(3.0);
+
         System.out.println("Starting verification for " + iterations + " steps");
 
         for (int i = 0; i < iterations; i++) {

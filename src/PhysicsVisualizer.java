@@ -30,6 +30,8 @@ public class PhysicsVisualizer extends JPanel {
             PolygonBody body = new PolygonBody(pos, radius);
             // sequentialEngine.getBodies().add(body);
             parallelEngine.getBodies().add(body);
+            // sequentialEngine.initializeGrid(3.0);
+            parallelEngine.initializeGrid(3.0);
         }
     }
 

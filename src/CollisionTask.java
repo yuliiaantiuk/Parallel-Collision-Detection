@@ -4,7 +4,7 @@ public class CollisionTask extends RecursiveAction {
     private final int startCol, endCol;
     private final ParallelPhysicsEngine engine;
     private final double dt;
-    private static final int THRESHOLD = 2;
+    public static int THRESHOLD = 2;
 
     public CollisionTask(int startCol, int endCol, ParallelPhysicsEngine engine, double dt) {
         this.startCol = startCol;

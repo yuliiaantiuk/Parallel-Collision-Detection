@@ -5,7 +5,7 @@ public class UpdatePositionTask extends RecursiveAction {
     private final List<PolygonBody> bodies;
     private final int start, end;
     private final double dt, width, height;
-    private static final int THRESHOLD = 1000;
+    public static int THRESHOLD = 1000;
 
     public UpdatePositionTask(List<PolygonBody> bodies, int start, int end, double dt, double width, double height) {
         this.bodies = bodies;

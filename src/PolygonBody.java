@@ -20,7 +20,7 @@ public class PolygonBody {
     }
 
     public PolygonBody(PolygonBody other) {
-        this.id = other.id; // Копіюємо ID!
+        this.id = other.id;
         this.position = new Vector2D(other.position.x, other.position.y);
         this.velocity = new Vector2D(other.velocity.x, other.velocity.y);
         this.radius = other.radius;
