@@ -5,34 +5,60 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PhysicsVisualizer extends JPanel {
+    private enum EngineMode { SEQUENTIAL, THREAD_POOL, FORK_JOIN }
+    private EngineMode currentMode = EngineMode.SEQUENTIAL;
+
     private final PhysicsEngine sequentialEngine;
-    ParallelPhysicsEngine parallelEngine;
+    private final ParallelPhysicsEngine parallelEngine;
+
     private final int width = 800;
     private final int height = 600;
 
-    public PhysicsVisualizer(int num_threads) {
+    public PhysicsVisualizer(int numThreads) {
         sequentialEngine = new PhysicsEngine(width, height);
-        parallelEngine = new ParallelPhysicsEngine(width, height, num_threads);
-        generateInitialBodies(30);
+        parallelEngine = new ParallelPhysicsEngine(width, height, numThreads);
+
+        generateInitialBodies(100);
 
         this.setPreferredSize(new Dimension(width, height));
         this.setBackground(Color.WHITE);
+
+        setupControlPanel();
+    }
+
+    private void setupControlPanel() {
+        JPanel controlPanel = new JPanel();
+
+        JButton seqBtn = new JButton("Sequential");
+        JButton tpBtn = new JButton("Thread Pool");
+        JButton fjBtn = new JButton("ForkJoin");
+
+        seqBtn.addActionListener(e -> currentMode = EngineMode.SEQUENTIAL);
+        tpBtn.addActionListener(e -> currentMode = EngineMode.THREAD_POOL);
+        fjBtn.addActionListener(e -> currentMode = EngineMode.FORK_JOIN);
+
+        controlPanel.add(seqBtn);
+        controlPanel.add(tpBtn);
+        controlPanel.add(fjBtn);
     }
 
     private void generateInitialBodies(int count) {
+        PolygonBody.resetIdCounter();
         for (int i = 0; i < count; i++) {
-            double radius = 15 + Math.random() * 35;
+            double radius = 10 + Math.random() * 20;
             Vector2D pos = new Vector2D(
                     radius + Math.random() * (width - 2 * radius),
                     radius + Math.random() * (height - 2 * radius)
             );
 
             PolygonBody body = new PolygonBody(pos, radius);
-            // sequentialEngine.getBodies().add(body);
-            parallelEngine.getBodies().add(body);
-            // sequentialEngine.initializeGrid(3.0);
-            parallelEngine.initializeGrid(3.0);
+
+            sequentialEngine.getBodies().add(new PolygonBody(body));
+            parallelEngine.getBodies().add(new PolygonBody(body));
         }
+
+        sequentialEngine.initializeGrid(3.0);
+        parallelEngine.initializeGrid(3.0);
     }
 
     public void startSimulation() {
@@ -44,14 +70,16 @@ public class PhysicsVisualizer extends JPanel {
 
             if (deltaTime > 0.05) deltaTime = 0.05;
 
-            long startCalc = System.nanoTime();
-            // sequentialEngine.update(deltaTime);
-            parallelEngine.update(deltaTime);
-            long endCalc = System.nanoTime();
-
-            if (System.currentTimeMillis() % 1000 < 15) {
-                double ms = (endCalc - startCalc) / 1_000_000.0;
-                System.out.printf("Objects: %d | Calc Time: %.3f ms\n", sequentialEngine.getBodies().size(), ms);
+            switch (currentMode) {
+                case SEQUENTIAL:
+                    sequentialEngine.update(deltaTime);
+                    break;
+                case THREAD_POOL:
+                    parallelEngine.update(deltaTime);
+                    break;
+                case FORK_JOIN:
+                    parallelEngine.updateForkJoin(deltaTime);
+                    break;
             }
 
             repaint();
@@ -70,22 +98,22 @@ public class PhysicsVisualizer extends JPanel {
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        g2.setColor(Color.BLACK);
-        g2.setStroke(new BasicStroke(2f));
+        List<PolygonBody> bodiesToDraw = (currentMode == EngineMode.SEQUENTIAL)
+                ? sequentialEngine.getBodies()
+                : parallelEngine.getBodies();
 
-//        for (PolygonBody body : sequentialEngine.getBodies()) {
-//            drawPolygon(g2, body);
-//        }
-        for (PolygonBody body : parallelEngine.getBodies()) {
+        for (PolygonBody body : bodiesToDraw) {
             drawPolygon(g2, body);
         }
+
+        g2.setColor(Color.DARK_GRAY);
+        g2.setFont(new Font("Arial", Font.BOLD, 14));
+        g2.drawString("Mode: " + currentMode, 20, 30);
+        g2.drawString("Objects: " + bodiesToDraw.size(), 20, 70);
     }
 
     private void drawPolygon(Graphics2D g2, PolygonBody body) {
-        if (body.vertices.isEmpty()) return;
-
         Path2D polygonPath = new Path2D.Double();
-
         Vector2D firstV = body.vertices.get(0);
         polygonPath.moveTo(body.position.x + firstV.x, body.position.y + firstV.y);
 
@@ -93,69 +121,38 @@ public class PhysicsVisualizer extends JPanel {
             Vector2D v = body.vertices.get(i);
             polygonPath.lineTo(body.position.x + v.x, body.position.y + v.y);
         }
-
         polygonPath.closePath();
 
-        g2.setColor(new Color(100, 150, 255, 100));
+        g2.setColor(new Color(100, 150, 255, 150));
         g2.fill(polygonPath);
-
         g2.setColor(Color.BLUE);
         g2.draw(polygonPath);
     }
 
     public static void main(String[] args) {
-//        JFrame frame = new JFrame("Collision Detection Sequential 1");
-//        PhysicsVisualizer visualizer = new PhysicsVisualizer();
-//
-//        frame.add(visualizer);
-//        frame.pack();
-//        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-//        frame.setLocationRelativeTo(null);
-//        frame.setVisible(true);
-//        new Thread(visualizer::startSimulation).start();
+        JFrame frame = new JFrame("Physics Engine Comparison");
+        PhysicsVisualizer visualizer = new PhysicsVisualizer(8); // 8 потоків
 
-        JFrame frame = new JFrame("Collision Detection Parallel 1");
-        PhysicsVisualizer visualizer = new PhysicsVisualizer(4);
+        JPanel btnPanel = new JPanel();
+        JButton b1 = new JButton("Sequential");
+        JButton b2 = new JButton("Thread Pool");
+        JButton b3 = new JButton("ForkJoin");
 
-        frame.add(visualizer);
+        b1.addActionListener(e -> visualizer.currentMode = EngineMode.SEQUENTIAL);
+        b2.addActionListener(e -> visualizer.currentMode = EngineMode.THREAD_POOL);
+        b3.addActionListener(e -> visualizer.currentMode = EngineMode.FORK_JOIN);
+
+        btnPanel.add(b1); btnPanel.add(b2); btnPanel.add(b3);
+
+        frame.setLayout(new BorderLayout());
+        frame.add(visualizer, BorderLayout.CENTER);
+        frame.add(btnPanel, BorderLayout.SOUTH);
+
         frame.pack();
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
+
         new Thread(visualizer::startSimulation).start();
-
-
-//        int[] threads = {2, 4, 6, 8, 10, 12};
-//        int[] sizes = {100, 500, 1000, 1500, 2500, 5000, 10000, 20000, 50000, 100000};
-//
-//        for (int size : sizes) {
-//            for (int thread : threads) {
-//                PhysicsVisualizer visualizer = new PhysicsVisualizer(thread);
-//                visualizer.runBenchmark(size);
-//            }
-//        }
-
-    }
-
-    public void runBenchmark(int objectCount) {
-        sequentialEngine.getBodies().clear();
-        generateInitialBodies(objectCount);
-
-        double dt = 0.016;
-        long totalTime = 0;
-        int runs = 5;
-
-        parallelEngine.update(dt);
-
-        for (int i = 0; i < runs; i++) {
-            long start = System.nanoTime();
-            parallelEngine.update(dt);
-            long end = System.nanoTime();
-
-            totalTime += (end - start);
-        }
-
-        long averageTime = totalTime / runs;
-        System.out.println("Average time for " + objectCount + " objects: " + (averageTime / 1_000_000_000.0) + " s");
     }
 }

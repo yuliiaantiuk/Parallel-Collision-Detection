@@ -3,13 +3,13 @@ import java.util.List;
 
 public class Test {
     public static void main(String[] args) {
-        int testSize = 1000;
+        int testSize = 100;
         double dt = 0.016;
-        int iterations = 100;
+        int iterations = 1;
 
         PhysicsEngine sequentialEngine = new PhysicsEngine(800, 600);
-        ParallelPhysicsEngine poolEngine = new ParallelPhysicsEngine(800, 600, 1);
-        ParallelPhysicsEngine fjEngine = new ParallelPhysicsEngine(800, 600, 1);
+        ParallelPhysicsEngine poolEngine = new ParallelPhysicsEngine(800, 600, 4);
+        ParallelPhysicsEngine fjEngine = new ParallelPhysicsEngine(800, 600, 4);
 
         List<PolygonBody> prototypes = new ArrayList<>();
         PolygonBody.resetIdCounter();

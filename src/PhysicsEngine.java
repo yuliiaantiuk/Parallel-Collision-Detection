@@ -1,10 +1,12 @@
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class PhysicsEngine {
     public List<PolygonBody> bodies;
     public UniformGrid grid;
     public double width, height;
+    public AtomicInteger collisionCounter = new AtomicInteger(0);
 
     public PhysicsEngine(double width, double height) {
         this.width = width;
@@ -79,6 +81,7 @@ public class PhysicsEngine {
         if (distSq < minSize * minSize) {
             CollisionInfo info = CollisionDetector.getCollisionInfo(a, b);
             if (info.collided) {
+                collisionCounter.incrementAndGet();
                 resolveCollision(a, b, info);
             }
         }

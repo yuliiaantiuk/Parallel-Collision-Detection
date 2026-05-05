@@ -6,7 +6,7 @@ public class CollisionDetector {
         CollisionInfo info = new CollisionInfo();
         List<Vector2D> axes = getAxes(a, b);
 
-        double minOverlap = Double.MAX_VALUE; // нескінченність на початку
+        double minOverlap = Double.MAX_VALUE;
         Vector2D smallestAxis = null;
 
         for (Vector2D axis : axes) {
