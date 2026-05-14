@@ -26,8 +26,9 @@ public class CollisionTask extends RecursiveAction {
             int mid = startCol + width / 2;
             CollisionTask left = new CollisionTask(startCol, mid, engine, dt);
             CollisionTask right = new CollisionTask(mid, endCol, engine, dt);
-
-            invokeAll(left, right);
+            left.fork();
+            right.compute();
+            left.join();
         }
     }
 }
