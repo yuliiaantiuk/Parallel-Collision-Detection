@@ -58,30 +58,47 @@ public class ParallelPhysicsEngine extends PhysicsEngine {
 
     private void parallelResolveCollisions() {
         ExecutorService exec = getExecutor();
-
-        CountDownLatch latch = new CountDownLatch(threadCount);
         int cols = grid.getCols();
-        int chunkSize = (int) Math.ceil((double) cols / threadCount);
+        int evenColsCount = (int) Math.ceil((double) cols / 2);
+        CountDownLatch evenLatch = new CountDownLatch(evenColsCount);
 
-        for (int t = 0; t < threadCount; t++) {
-            final int startX = t * chunkSize;
-            final int endX = Math.min(startX + chunkSize, cols);
-
+        for (int x = 0; x < cols; x += 2) {
+            final int currentX = x;
             exec.submit(() -> {
                 try {
-                    for (int x = startX; x < endX; x++) {
-                        for (int y = 0; y < grid.getRows(); y++) {
-                            checkCollisionsInCell(x, y);
-                        }
+                    for (int y = 0; y < grid.getRows(); y++) {
+                        checkCollisionsInCell(currentX, y);
                     }
                 } finally {
-                    latch.countDown();
+                    evenLatch.countDown();
                 }
             });
         }
 
         try {
-            latch.await();
+            evenLatch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        int oddColsCount = cols / 2;
+        CountDownLatch oddLatch = new CountDownLatch(oddColsCount);
+
+        for (int x = 1; x < cols; x += 2) {
+            final int currentX = x;
+            exec.submit(() -> {
+                try {
+                    for (int y = 0; y < grid.getRows(); y++) {
+                        checkCollisionsInCell(currentX, y);
+                    }
+                } finally {
+                    oddLatch.countDown();
+                }
+            });
+        }
+
+        try {
+            oddLatch.await();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -93,18 +110,13 @@ public class ParallelPhysicsEngine extends PhysicsEngine {
 
         ExecutorService exec = getExecutor();
 
-        CountDownLatch latch = new CountDownLatch(threadCount);
+        int chunkSize = (int) Math.ceil((double) size / (threadCount * 2));
+        int actualTasks = (int) Math.ceil((double) size / chunkSize);
+        CountDownLatch latch = new CountDownLatch(actualTasks);
 
-        int chunkSize = (int) Math.ceil((double) size / threadCount);
-
-        for (int t = 0; t < threadCount; t++) {
+        for (int t = 0; t < actualTasks; t++) {
             final int startIdx = t * chunkSize;
             final int endIdx = Math.min(startIdx + chunkSize, size);
-
-            if (startIdx >= size) {
-                latch.countDown();
-                continue;
-            }
 
             exec.submit(() -> {
                 try {

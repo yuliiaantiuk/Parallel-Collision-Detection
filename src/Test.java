@@ -8,8 +8,8 @@ public class Test {
         int iterations = 1;
 
         PhysicsEngine sequentialEngine = new PhysicsEngine(800, 600);
-        ParallelPhysicsEngine poolEngine = new ParallelPhysicsEngine(800, 600, 4);
-        ParallelPhysicsEngine fjEngine = new ParallelPhysicsEngine(800, 600, 4);
+        ParallelPhysicsEngine poolEngine = new ParallelPhysicsEngine(800, 600, 1);
+        ParallelPhysicsEngine fjEngine = new ParallelPhysicsEngine(800, 600, 1);
 
         List<PolygonBody> prototypes = new ArrayList<>();
         PolygonBody.resetIdCounter();
