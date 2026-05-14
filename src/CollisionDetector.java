@@ -62,12 +62,10 @@ public class CollisionDetector {
         double max = -Double.MAX_VALUE;
 
         for (Vector2D vertex : body.vertices) {
-            // координати відносно простору, а не центру об'єкта
             double worldVertexX = body.position.x + vertex.x;
             double worldVertexY = body.position.y + vertex.y;
 
             double dot = worldVertexX * axis.x + worldVertexY * axis.y;
-            // найлівіша і найправіша точка
             if (dot < min) min = dot;
             if (dot > max) max = dot;
         }
