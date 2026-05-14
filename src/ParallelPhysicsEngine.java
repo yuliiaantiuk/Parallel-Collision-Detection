@@ -6,15 +6,27 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 
 public class ParallelPhysicsEngine extends PhysicsEngine {
-    private final ExecutorService executor;
+    private ExecutorService executor;
     private final int threadCount;
-    private final ForkJoinPool forkJoinPool;
+    private ForkJoinPool forkJoinPool;
 
     public ParallelPhysicsEngine(double width, double height, int threads) {
         super(width, height);
         this.threadCount = threads;
-        this.executor = Executors.newFixedThreadPool(threads);
-        this.forkJoinPool = new ForkJoinPool(threads);
+    }
+
+    private ExecutorService getExecutor() {
+        if (executor == null || executor.isShutdown()) {
+            executor = Executors.newFixedThreadPool(threadCount);
+        }
+        return executor;
+    }
+
+    private ForkJoinPool getForkJoinPool() {
+        if (forkJoinPool == null || forkJoinPool.isShutdown()) {
+            forkJoinPool = new ForkJoinPool(threadCount);
+        }
+        return forkJoinPool;
     }
 
     @Override
@@ -30,8 +42,10 @@ public class ParallelPhysicsEngine extends PhysicsEngine {
     }
 
     public void updateForkJoin(double dt) {
+        ForkJoinPool fjPool = getForkJoinPool();
+
         if (!bodies.isEmpty()) {
-            forkJoinPool.invoke(new UpdatePositionTask(bodies, 0, bodies.size(), dt, width, height));
+            fjPool.invoke(new UpdatePositionTask(bodies, 0, bodies.size(), dt, width, height));
         }
 
         grid.clear();
@@ -39,10 +53,12 @@ public class ParallelPhysicsEngine extends PhysicsEngine {
             grid.insert(b);
         }
 
-        forkJoinPool.invoke(new CollisionTask(0, grid.getCols(), this, dt));
+        fjPool.invoke(new CollisionTask(0, grid.getCols(), this, dt));
     }
 
     private void parallelResolveCollisions() {
+        ExecutorService exec = getExecutor();
+
         CountDownLatch latch = new CountDownLatch(threadCount);
         int cols = grid.getCols();
         int chunkSize = (int) Math.ceil((double) cols / threadCount);
@@ -51,7 +67,7 @@ public class ParallelPhysicsEngine extends PhysicsEngine {
             final int startX = t * chunkSize;
             final int endX = Math.min(startX + chunkSize, cols);
 
-            executor.submit(() -> {
+            exec.submit(() -> {
                 try {
                     for (int x = startX; x < endX; x++) {
                         for (int y = 0; y < grid.getRows(); y++) {
@@ -75,6 +91,8 @@ public class ParallelPhysicsEngine extends PhysicsEngine {
         int size = bodies.size();
         if (size == 0) return;
 
+        ExecutorService exec = getExecutor();
+
         CountDownLatch latch = new CountDownLatch(threadCount);
 
         int chunkSize = (int) Math.ceil((double) size / threadCount);
@@ -88,7 +106,7 @@ public class ParallelPhysicsEngine extends PhysicsEngine {
                 continue;
             }
 
-            executor.submit(() -> {
+            exec.submit(() -> {
                 try {
                     for (int i = startIdx; i < endIdx; i++) {
                         bodies.get(i).update(dt, width, height);
@@ -107,7 +125,13 @@ public class ParallelPhysicsEngine extends PhysicsEngine {
     }
 
     public void shutdown() {
-        executor.shutdown();
-        forkJoinPool.shutdown();
+        if (executor != null) {
+            executor.shutdown();
+            executor = null;
+        }
+        if (forkJoinPool != null) {
+            forkJoinPool.shutdown();
+            forkJoinPool = null;
+        }
     }
 }
