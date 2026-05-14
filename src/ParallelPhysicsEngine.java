@@ -1,9 +1,5 @@
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.*;
+import java.util.concurrent.TimeUnit;
 
 public class ParallelPhysicsEngine extends PhysicsEngine {
     private ExecutorService executor;
@@ -138,12 +134,24 @@ public class ParallelPhysicsEngine extends PhysicsEngine {
 
     public void shutdown() {
         if (executor != null) {
-            executor.shutdown();
+            shutdownPool(executor);
             executor = null;
         }
         if (forkJoinPool != null) {
-            forkJoinPool.shutdown();
+            shutdownPool(forkJoinPool);
             forkJoinPool = null;
+        }
+    }
+
+    private void shutdownPool(ExecutorService pool) {
+        pool.shutdown();
+        try {
+            if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+                pool.shutdownNow();
+            }
+        } catch (InterruptedException ie) {
+            pool.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 }
