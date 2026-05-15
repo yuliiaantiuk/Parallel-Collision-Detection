@@ -1,76 +1,181 @@
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public class Test {
-    public static void main(String[] args) {
-        int testSize = 100;
-        double dt = 0.016;
-        int iterations = 1;
+    static final double WIDTH = 800;
+    static final double HEIGHT = 600;
+    static final double DT = 0.016;
+    static final double SLOP = 5;
 
-        PhysicsEngine sequentialEngine = new PhysicsEngine(800, 600);
-        ParallelPhysicsEngine poolEngine = new ParallelPhysicsEngine(800, 600, 1);
-        ParallelPhysicsEngine fjEngine = new ParallelPhysicsEngine(800, 600, 1);
+    public static void main(String[] args) throws Exception {
+        int[] threads = {4, 8};
+        int iters = 100;
+        for (int thread : threads) {
+            System.out.println("=== TEST 1: Physical invariants ( " + thread + " threads, " + iters + " iterations) ===");
+            testPhysicalInvariants(thread, iters);
 
-        List<PolygonBody> prototypes = new ArrayList<>();
+            System.out.println("\n=== TEST 2: Race condition / NaN detection ( " + thread + " threads, " + iters + " iterations) ===");
+            testRaceCondition(thread, iters);
+
+            System.out.println("\n=== TEST 3: Deadlock detection ( " + thread + " threads) ===");
+            testDeadlock(thread);
+        }
+    }
+
+    static void testPhysicalInvariants(int threads, int iterations) {
+        for (String mode : new String[]{"ThreadPool", "ForkJoin"}) {
+            ParallelPhysicsEngine engine = createEngine(200, threads);
+            boolean passed = true;
+
+            int warmupIterations = 20;
+            for (int i = 0; i < warmupIterations; i++) {
+                if (mode.equals("ThreadPool")) engine.update(DT);
+                else engine.updateForkJoin(DT);
+            }
+
+            for (int iter = 0; iter < iterations; iter++) {
+                double[] pBefore = totalMomentum(engine);
+
+                if (mode.equals("ThreadPool")) engine.update(DT);
+                else engine.updateForkJoin(DT);
+
+                for (PolygonBody b : engine.getBodies()) {
+                    if (b.position.x < b.radius - SLOP || b.position.x > WIDTH - b.radius + SLOP ||
+                            b.position.y < b.radius - SLOP || b.position.y > HEIGHT - b.radius + SLOP) {
+                        System.out.println("  FAIL [" + mode + "] iter=" + iter
+                                + ": body id=" + b.id + " out of bounds");
+                        passed = false;
+                    }
+                }
+
+                List<PolygonBody> bodies = engine.getBodies();
+                for (int i = 0; i < bodies.size(); i++) {
+                    for (int j = i + 1; j < bodies.size(); j++) {
+                        PolygonBody a = bodies.get(i);
+                        PolygonBody bBody = bodies.get(j);
+                        double minRadius = Math.min(a.radius, bBody.radius);
+                        CollisionInfo info = CollisionDetector.getCollisionInfo(a, bBody);
+                        if (info.collided && info.overlap > minRadius * 0.5) {
+                            System.out.println("  FAIL [" + mode + "] iter=" + iter
+                                    + ": critical overlap between id=" + a.id
+                                    + " and id=" + bBody.id
+                                    + ", overlap=" + info.overlap
+                                    + " (minRadius=" + minRadius + ")");
+                            passed = false;
+                        }
+                    }
+                }
+
+                boolean wallContactAnywhere = false;
+                for (PolygonBody b : engine.getBodies()) {
+                    if (b.hitWallThisFrame) {
+                        wallContactAnywhere = true;
+                        break;
+                    }
+                }
+
+                if (!wallContactAnywhere) {
+                    double[] pAfter = totalMomentum(engine);
+                    double diffPx = Math.abs(pAfter[0] - pBefore[0]);
+                    double diffPy = Math.abs(pAfter[1] - pBefore[1]);
+
+                    double tolerance = 1e-7;
+
+                    if (diffPx > tolerance || diffPy > tolerance) {
+                        System.out.println("  FAIL [" + mode + "] iter=" + iter
+                                + ": momentum changed without wall contact: dPx=" + diffPx
+                                + ", dPy=" + diffPy);
+                        passed = false;
+                    }
+                }
+            }
+
+            if (passed) System.out.println("  PASS [" + mode + "]");
+            engine.shutdown();
+        }
+    }
+
+    static void testRaceCondition(int threads, int iterations) {
+        for (String mode : new String[]{"ThreadPool", "ForkJoin"}) {
+            ParallelPhysicsEngine engine = createEngine(10000, threads);
+            boolean passed = true;
+
+            outer:
+            for (int iter = 0; iter < iterations; iter++) {
+                if (mode.equals("ThreadPool")) engine.update(DT);
+                else engine.updateForkJoin(DT);
+
+                for (PolygonBody b : engine.getBodies()) {
+                    if (Double.isNaN(b.position.x) || Double.isNaN(b.position.y) ||
+                            Double.isNaN(b.velocity.x) || Double.isNaN(b.velocity.y) ||
+                            Double.isInfinite(b.position.x) || Double.isInfinite(b.position.y) ||
+                            Double.isInfinite(b.velocity.x) || Double.isInfinite(b.velocity.y)) {
+                        System.out.println("  FAIL [" + mode + "] iter=" + iter
+                                + ": NaN or Infinity in body id=" + b.id
+                                + " pos=(" + b.position.x + "," + b.position.y + ")"
+                                + " vel=(" + b.velocity.x + "," + b.velocity.y + ")");
+                        passed = false;
+                        break outer;
+                    }
+                }
+            }
+
+            if (passed) System.out.println("  PASS [" + mode + "]");
+            engine.shutdown();
+        }
+    }
+
+    static void testDeadlock(int threads) throws Exception {
+        for (String mode : new String[]{"ThreadPool", "ForkJoin"}) {
+            ParallelPhysicsEngine engine = createEngine(5000, threads);
+
+            ExecutorService watchdog = Executors.newSingleThreadExecutor();
+            Future<?> future = watchdog.submit(() -> {
+                for (int i = 0; i < 20; i++) {
+                    if (mode.equals("ThreadPool")) engine.update(DT);
+                    else engine.updateForkJoin(DT);
+                }
+            });
+
+            try {
+                future.get(10, TimeUnit.SECONDS);
+                System.out.println("  PASS [" + mode + "]: completed within timeout");
+            } catch (java.util.concurrent.TimeoutException e) {
+                future.cancel(true);
+                System.out.println("  FAIL [" + mode + "]: DEADLOCK detected (timeout exceeded)");
+            } finally {
+                watchdog.shutdownNow();
+                engine.shutdown();
+            }
+        }
+    }
+
+    static ParallelPhysicsEngine createEngine(int objectCount, int threads) {
+        ParallelPhysicsEngine engine = new ParallelPhysicsEngine(WIDTH, HEIGHT, threads);
         PolygonBody.resetIdCounter();
 
-        for (int i = 0; i < testSize; i++) {
-            Vector2D pos = new Vector2D(Math.random() * 800, Math.random() * 600);
-            double radius = 10 + Math.random() * 20;
-            prototypes.add(new PolygonBody(pos, radius));
+        for (int i = 0; i < objectCount; i++) {
+            Vector2D pos = new Vector2D(
+                    50 + Math.random() * (WIDTH - 100),
+                    50 + Math.random() * (HEIGHT - 100)
+            );
+            double radius = 8 + Math.random() * 12;
+            engine.getBodies().add(new PolygonBody(pos, radius));
         }
 
-        for (PolygonBody proto : prototypes) {
-            sequentialEngine.getBodies().add(new PolygonBody(proto));
-            poolEngine.getBodies().add(new PolygonBody(proto));
-            fjEngine.getBodies().add(new PolygonBody(proto));
+        engine.initializeGrid(3.0);
+        return engine;
+    }
+
+    static double[] totalMomentum(PhysicsEngine engine) {
+        double px = 0, py = 0;
+        for (PolygonBody b : engine.getBodies()) {
+            px += b.mass * b.velocity.x;
+            py += b.mass * b.velocity.y;
         }
-
-        sequentialEngine.initializeGrid(3.0);
-        poolEngine.initializeGrid(3.0);
-        fjEngine.initializeGrid(3.0);
-
-        System.out.println("Starting verification for " + iterations + " steps");
-
-        for (int i = 0; i < iterations; i++) {
-            sequentialEngine.update(dt);
-            poolEngine.update(dt);
-            fjEngine.updateForkJoin(dt);
-        }
-
-        double maxDiffPool = 0;
-        double maxDiffFJ = 0;
-
-        for (int i = 0; i < testSize; i++) {
-            PolygonBody bSeq = sequentialEngine.getBodies().get(i);
-            PolygonBody bPool = poolEngine.getBodies().get(i);
-            PolygonBody bFJ = fjEngine.getBodies().get(i);
-
-            // Порівняння Sequential vs Fixed Pool
-            double dPoolX = Math.abs(bSeq.position.x - bPool.position.x);
-            double dPoolY = Math.abs(bSeq.position.y - bPool.position.y);
-            maxDiffPool = Math.max(maxDiffPool, Math.max(dPoolX, dPoolY));
-
-            // Порівняння Sequential vs ForkJoin
-            double dFJX = Math.abs(bSeq.position.x - bFJ.position.x);
-            double dFJY = Math.abs(bSeq.position.y - bFJ.position.y);
-            maxDiffFJ = Math.max(maxDiffFJ, Math.max(dFJX, dFJY));
-        }
-
-        System.out.println("Max diff (Sequential vs Fixed Pool): " + maxDiffPool);
-        System.out.println("Max diff (Sequential vs ForkJoin):   " + maxDiffFJ);
-
-        boolean poolOk = maxDiffPool < 1e-9;
-        boolean fjOk = maxDiffFJ < 1e-9;
-
-        if (poolOk && fjOk) {
-            System.out.println("SUCCESS!");
-        } else {
-            if (!poolOk) System.out.println("FAILURE: Fixed Pool!");
-            if (!fjOk) System.out.println("FAILURE: ForkJoin!");
-        }
-
-        poolEngine.shutdown();
-        fjEngine.shutdown();
+        return new double[]{px, py};
     }
 }

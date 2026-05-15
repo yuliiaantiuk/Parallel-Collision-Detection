@@ -9,6 +9,7 @@ public class PolygonBody {
     public List<Vector2D> vertices;
     public double radius;
     public double mass;
+    public boolean hitWallThisFrame = false;
 
     public PolygonBody(Vector2D pos, double radius) {
         this.id = nextId++;
@@ -44,23 +45,28 @@ public class PolygonBody {
     public static void resetIdCounter() { nextId = 0; }
 
     public void update(double dt, double width, double height) {
+        hitWallThisFrame = false;
         position.x += velocity.x * dt;
         position.y += velocity.y * dt;
 
         if (position.x < radius) {
             position.x = radius;
             velocity.x = Math.abs(velocity.x);
+            hitWallThisFrame = true;
         } else if (position.x > width - radius) {
             position.x = width - radius;
             velocity.x = -Math.abs(velocity.x);
+            hitWallThisFrame = true;
         }
 
         if (position.y < radius) {
             position.y = radius;
             velocity.y = Math.abs(velocity.y);
+            hitWallThisFrame = true;
         } else if (position.y > height - radius) {
             position.y = height - radius;
             velocity.y = -Math.abs(velocity.y);
+            hitWallThisFrame = true;
         }
     }
 }
