@@ -57,8 +57,8 @@ public class PhysicsVisualizer extends JPanel {
             parallelEngine.getBodies().add(new PolygonBody(body));
         }
 
-        sequentialEngine.initializeGrid(3.0);
-        parallelEngine.initializeGrid(3.0);
+        sequentialEngine.initializeGrid(2.0);
+        parallelEngine.initializeGrid(2.0);
     }
 
     public void startSimulation() {
@@ -131,7 +131,7 @@ public class PhysicsVisualizer extends JPanel {
 
     public static void main(String[] args) {
         JFrame frame = new JFrame("Physics Engine Comparison");
-        PhysicsVisualizer visualizer = new PhysicsVisualizer(8); // 8 потоків
+        PhysicsVisualizer visualizer = new PhysicsVisualizer(8);
 
         JPanel btnPanel = new JPanel();
         JButton b1 = new JButton("Sequential");

@@ -8,12 +8,12 @@ public class ResearchRunner {
     private static final int WIDTH = 1000;
     private static final int HEIGHT = 1000;
     private static final double DT = 0.016;
-    private static final double RUNS = 3;
+    private static final double RUNS = 20;
 
     public static void main(String[] args) {
+        runThresholdResearch();
+        runScalerResearch();
         runGeneralResearch();
-//        runScalerResearch();
-//        runThresholdResearch();
     }
 
     private static void runGeneralResearch() {
@@ -38,10 +38,6 @@ public class ResearchRunner {
                         ParallelPhysicsEngine engineFJ = createEngine(prototypes, threads, scaler);
                         double tFJ = measureParallel(engineFJ, true);
                         engineFJ.shutdown();
-//                        ParallelPhysicsEngine engine = createEngine(prototypes, threads, scaler);
-//
-//                        double tTP = measureParallel(engine, false);
-//                        double tFJ = measureParallel(engine, true);
 
                         pw.printf("%d;%d;%.6f;%.6f;%.2f;%.6f;%.2f\n", size, threads, tSeq, tTP, tSeq/tTP, tFJ, tSeq/tFJ);
                     }
@@ -60,7 +56,6 @@ public class ResearchRunner {
 
         try (PrintWriter pw = new PrintWriter(new FileWriter("research_scaler_final.csv"))) {
             pw.println("Objects;Threads;Scaler;Time_Seq;Time_TP;S_TP;Time_FJ;S_FJ");
-            System.out.println("Scaler Research Started");
 
             for (int size : sizes) {
                 List<PolygonBody> prototypes = generatePrototypes(size);
@@ -69,13 +64,15 @@ public class ResearchRunner {
                     double tSeq = measureSequential(prototypes, scaler);
 
                     for (int threads : threadConfigs) {
-                        ParallelPhysicsEngine engine = createEngine(prototypes, threads, scaler);
+                        ParallelPhysicsEngine engineTP = createEngine(prototypes, threads, scaler);
+                        double tTP = measureParallel(engineTP, false);
+                        engineTP.shutdown();
 
-                        double tTP = measureParallel(engine, false);
-                        double tFJ = measureParallel(engine, true);
+                        ParallelPhysicsEngine engineFJ = createEngine(prototypes, threads, scaler);
+                        double tFJ = measureParallel(engineFJ, true);
+                        engineFJ.shutdown();
 
                         pw.printf("%d;%d;%.1f;%.6f;%.6f;%.2f;%.6f;%.2f\n", size, threads, scaler, tSeq, tTP, tSeq/tTP, tFJ, tSeq/tFJ);
-                        engine.shutdown();
                     }
                     pw.flush();
                 }
@@ -95,7 +92,7 @@ public class ResearchRunner {
         System.out.println("=== THRESHOLD RESEARCH ===");
 
         try (PrintWriter pw = new PrintWriter(new FileWriter("research_threshold_combined.csv"))) {
-            pw.println("Objects;Th_Update;Th_Coll;Time_Seq;Time_FJ;S_FJ");
+            pw.println("Objects;Threads;Th_Update;Th_Coll;Time_Seq;Time_FJ;S_FJ");
             for (int size : sizes) {
                 List<PolygonBody> prototypes = generatePrototypes(size);
                 double tSeq = measureSequential(prototypes, scaler);
@@ -106,8 +103,7 @@ public class ResearchRunner {
                             CollisionTask.THRESHOLD = tc;
                             ParallelPhysicsEngine engine = createEngine(prototypes, thread, scaler);
                             double tFJ = measureParallel(engine, true);
-                            pw.printf("%d;%d;%d;%.6f;%.6f;%.2f\n", size, tu, tc, tSeq, tFJ, tSeq/tFJ);
-                            engine.shutdown();
+                            pw.printf("%d;%d;%d;%d;%.6f;%.6f;%.2f\n", size, thread, tu, tc, tSeq, tFJ, tSeq/tFJ);
                         }
                     }
                 }
@@ -138,6 +134,7 @@ public class ResearchRunner {
         for (PolygonBody p : prototypes) engine.getBodies().add(new PolygonBody(p));
         engine.initializeGrid(scaler);
         for (int i = 0; i < 2; i++) engine.update(DT);
+
         long start = System.nanoTime();
         for (int i = 0; i < RUNS; i++) engine.update(DT);
         return (System.nanoTime() - start) / (double) RUNS / 1_000_000_000.0;
@@ -147,10 +144,7 @@ public class ResearchRunner {
         for (int i = 0; i < 2; i++) {
             if (isFJ) engine.updateForkJoin(DT); else engine.update(DT);
         }
-//        long start = System.nanoTime();
-//        for (int i = 0; i < RUNS; i++) {
-//            if (isFJ) engine.updateForkJoin(DT); else engine.update(DT);
-//        }
+
         long start, end;
         if (isFJ) {
             start = System.nanoTime();
@@ -165,10 +159,6 @@ public class ResearchRunner {
             }
             end = System.nanoTime();
         }
-
-//        double result = (System.nanoTime() - start) / (double) RUNS / 1_000_000_000.0;
-//
-//        return result;
         return (end - start) / (double) RUNS / 1_000_000_000.0;
     }
 }
